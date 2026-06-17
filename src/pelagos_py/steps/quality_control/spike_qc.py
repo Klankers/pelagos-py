@@ -101,8 +101,17 @@ class spike_qc(BaseQC):
 
         self.flags = None
 
-    def return_qc(self):
-        #   New function
+    def return_qc(self) -> xr.Dataset:
+        """
+        Returns despike array of flags for specified variables.
+
+        User must specify method to run on selected variables, with
+        a condition "cond" following the colon. Cond varies on the test.
+
+        If user specifies to run despike method on profile-by-profile basis,
+        this will alert the user of NaNs in the profile number and those data points
+        will remain untested.
+        """
         self.data = self.data[self.required_variables]
         profile_idxs = self.slice_profiles()
 
@@ -153,7 +162,8 @@ class spike_qc(BaseQC):
 
         return self.flags
 
-    def slice_profiles(self):
+    def slice_profiles(self) -> list:
+        """Identifies start/stop indices of where each profile occurs."""
         profile_idxs = list()
         if self.by_profile:
             profiles = self.data["PROFILE_NUMBER"].values
@@ -172,7 +182,8 @@ class spike_qc(BaseQC):
 
     def rolling_median(
         self, data: np.ndarray, window: int = 10, sensitivity: int = 2
-    ) -> np.ndarray:  #   Default spike qc for pelagos
+    ) -> np.ndarray:
+        """Pelagos-py rolling median despike method."""
         rolling_median = (
             data.to_pandas().rolling(window=window, center=True).median().to_numpy()
         )
@@ -186,18 +197,36 @@ class spike_qc(BaseQC):
         return spike_flags
 
     def qartod_despike_diff(self, data: np.ndarray, thresh=0.02) -> np.ndarray:
+        """
+        IOOS QARTOD despike method, defaulting to the differential option.
+        The difference is taken before and after each point and the minimum of those
+        differences is used to compare against suspect and fail thresholds.
+
+        QARTOD flags
+        1 = Pass
+        2 = Not evaluated
+        3 = Suspect/questionable
+        4 = Fail or bad
+        9 = Missing
+        """
         from ioos_qc import spike_test as qartod_spike
 
         flags_qartod = qartod_spike(
             inp=data, fail_threshold=thresh, method="differential"
         )
-        flags = np.zeros(shape=flags_qartod.shape)
-        flags[np.where(flags_qartod == 4)] = 1
-        return flags
+        return flags_qartod
 
     def hampel_despike(
         self, data: np.ndarray, window: int = 3, nsigma: float = 3.0
     ) -> np.ndarray:
+        """
+        Hampel despike method.
+        Uses a Hampel filter to remove outliers, where:
+        * `window` is the number of neighbors on each side of the tested point and should
+          usually be odd.
+        * `nsigma` represents the number of standard deviations by which the point must differ
+          from the local median for it to be considered a spike
+        """
         data = np.asarray(data, dtype=float)
         n = len(data)
         half = window // 2
@@ -211,7 +240,7 @@ class spike_qc(BaseQC):
             mad = np.median(np.abs(window_data - med))
             if np.abs(data[i] - med) > nsigma * scale * mad:
                 mask[i] = True
-
+        mask = np.where((mask==True), 4, 1)  #   Translate detected spikes into bad flag
         return mask
 
     def plot_diagnostics(self):
