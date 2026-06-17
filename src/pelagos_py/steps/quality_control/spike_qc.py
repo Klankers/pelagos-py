@@ -101,90 +101,19 @@ class spike_qc(BaseQC):
 
         self.flags = None
 
-    def return_qc_1(self):
-        # Subset the data
-        self.data = self.data[self.required_variables]
-        breakpoint()
-        # Generate the variable-specific flags
-        for var, sensitivity in self.variables.items():
-            spike_qc = np.full(len(self.data[var]), 0)
-
-            # Apply the checks across individual profiles
-            profile_numbers = np.unique(
-                self.data["PROFILE_NUMBER"].dropna(dim="N_MEASUREMENTS")
-            )
-            for profile_number in tqdm(
-                profile_numbers,
-                colour="green",
-                desc=f"\033[97mProgress [{var}]\033[0m",
-                unit="prof",
-            ):
-                # Subset the data
-                profile = self.data.where(
-                    self.data["PROFILE_NUMBER"] == profile_number, drop=True
-                )
-
-                # remove nans
-                var_data = profile[var].dropna(dim="N_MEASUREMENTS")
-                if len(var_data) < self.window_size:
-                    continue
-
-                # Calculate the residules from the running median of the data
-                rolling_median = (
-                    var_data.to_pandas()
-                    .rolling(window=self.window_size, center=True)
-                    .median()
-                    .to_numpy()
-                )
-                residules = var_data - rolling_median
-
-                # Define the residule threshold
-                threshold = np.nanstd(residules) * sensitivity
-
-                # Apply the threshold to residules to get the flags
-                spike_flags = np.where((np.abs(residules) > threshold), 4, 1)
-
-                # Reinclude the nans as missing (9) flags
-                nan_mask = np.isnan(profile[var])
-                profile_flags = np.where(nan_mask, 9, 1)
-                profile_flags[np.where(~nan_mask)] = spike_flags
-
-                # Stitch the QC results back into the QC container
-                profile_indices = np.where(
-                    self.data["PROFILE_NUMBER"] == profile_number
-                )
-                spike_qc[profile_indices] = profile_flags
-
-            # Add the flags to the data
-            self.data[f"{var}_QC"] = (["N_MEASUREMENTS"], spike_qc)
-
-            # Broadcast the QC found for var into variables specified by "also_flag"
-            if extra_vars := self.also_flag.get(var):
-                for extra_var in extra_vars:
-                    self.data[f"{extra_var}_QC"] = self.data[f"{var}_QC"]
-
-        # Select just the flags
-        self.flags = self.data[
-            [var_qc for var_qc in self.data.data_vars if "_QC" in var_qc]
-        ]
-
-        return self.flags
-
     def return_qc(self):
         #   New function
         self.data = self.data[self.required_variables]
         profile_idxs = self.slice_profiles()
 
-        # breakpoint()
-
         for var, cond in self.variables.items():
             #   Runs the specified variable var with sensitivity tolerance
             var_data = self.data[var]
             new_flags = np.full(len(var_data), 0)  #   Init to 0, not assessed
-            # breakpoint()
+            
             for prof in profile_idxs:
                 data_pass_on = var_data[prof[0] : prof[1]]
-                # breakpoint()
+                
                 if self.method == "rolling median":
                     spike_flags = self.rolling_median(
                         data=data_pass_on, window=self.window_size, sensitivity=cond
@@ -200,8 +129,6 @@ class spike_qc(BaseQC):
 
                 new_flags[prof[0] : prof[1]] = spike_flags
 
-            # breakpoint()
-
             nan_mask = np.isnan(var_data)
             # if self.by_profile:   #   Uncomment to include unknown profile numbers as NaNs
             #     nan_mask += np.isnan(self.data["PROFILE_NUMBER"])
@@ -213,9 +140,6 @@ class spike_qc(BaseQC):
                     f"Despike method '{self.method}' has untested data (flag 0={list(profile_flags).count(0)}) following the test for {var}.\n"
                     f"Consider running on full series or check profile numbers."
                 )
-
-            profile_flags = np.where(nan_mask, 9, 1)
-            profile_flags[np.where(~nan_mask)] = new_flags
 
             self.data[f"{var}_QC"] = (["N_MEASUREMENTS"], profile_flags)
 
@@ -243,7 +167,7 @@ class spike_qc(BaseQC):
             profile_idxs.append(
                 (0, len(self.data["N_MEASUREMENTS"]) - 1)
             )  #   If not doing profile-by-profile, select whole thing
-        # breakpoint()
+        
         return profile_idxs
 
     def rolling_median(
@@ -344,3 +268,72 @@ class spike_qc(BaseQC):
 
         fig.tight_layout()
         plt.show(block=True)
+
+### Legacy code ###
+# def return_qc_1(self):
+#     # Subset the data
+#     self.data = self.data[self.required_variables]
+#     # Generate the variable-specific flags
+#     for var, sensitivity in self.variables.items():
+#         spike_qc = np.full(len(self.data[var]), 0)
+
+#         # Apply the checks across individual profiles
+#         profile_numbers = np.unique(
+#             self.data["PROFILE_NUMBER"].dropna(dim="N_MEASUREMENTS")
+#         )
+#         for profile_number in tqdm(
+#             profile_numbers,
+#             colour="green",
+#             desc=f"\033[97mProgress [{var}]\033[0m",
+#             unit="prof",
+#         ):
+#             # Subset the data
+#             profile = self.data.where(
+#                 self.data["PROFILE_NUMBER"] == profile_number, drop=True
+#             )
+
+#             # remove nans
+#             var_data = profile[var].dropna(dim="N_MEASUREMENTS")
+#             if len(var_data) < self.window_size:
+#                 continue
+
+#             # Calculate the residules from the running median of the data
+#             rolling_median = (
+#                 var_data.to_pandas()
+#                 .rolling(window=self.window_size, center=True)
+#                 .median()
+#                 .to_numpy()
+#             )
+#             residules = var_data - rolling_median
+
+#             # Define the residule threshold
+#             threshold = np.nanstd(residules) * sensitivity
+
+#             # Apply the threshold to residules to get the flags
+#             spike_flags = np.where((np.abs(residules) > threshold), 4, 1)
+
+#             # Reinclude the nans as missing (9) flags
+#             nan_mask = np.isnan(profile[var])
+#             profile_flags = np.where(nan_mask, 9, 1)
+#             profile_flags[np.where(~nan_mask)] = spike_flags
+
+#             # Stitch the QC results back into the QC container
+#             profile_indices = np.where(
+#                 self.data["PROFILE_NUMBER"] == profile_number
+#             )
+#             spike_qc[profile_indices] = profile_flags
+
+#         # Add the flags to the data
+#         self.data[f"{var}_QC"] = (["N_MEASUREMENTS"], spike_qc)
+
+#         # Broadcast the QC found for var into variables specified by "also_flag"
+#         if extra_vars := self.also_flag.get(var):
+#             for extra_var in extra_vars:
+#                 self.data[f"{extra_var}_QC"] = self.data[f"{var}_QC"]
+
+#     # Select just the flags
+#     self.flags = self.data[
+#         [var_qc for var_qc in self.data.data_vars if "_QC" in var_qc]
+#     ]
+
+#     return self.flags
