@@ -110,10 +110,10 @@ class spike_qc(BaseQC):
             #   Runs the specified variable var with sensitivity tolerance
             var_data = self.data[var]
             new_flags = np.full(len(var_data), 0)  #   Init to 0, not assessed
-            
+
             for prof in profile_idxs:
                 data_pass_on = var_data[prof[0] : prof[1]]
-                
+
                 if self.method == "rolling median":
                     spike_flags = self.rolling_median(
                         data=data_pass_on, window=self.window_size, sensitivity=cond
@@ -167,7 +167,7 @@ class spike_qc(BaseQC):
             profile_idxs.append(
                 (0, len(self.data["N_MEASUREMENTS"]) - 1)
             )  #   If not doing profile-by-profile, select whole thing
-        
+
         return profile_idxs
 
     def rolling_median(
@@ -268,6 +268,7 @@ class spike_qc(BaseQC):
 
         fig.tight_layout()
         plt.show(block=True)
+
 
 ### Legacy code ###
 # def return_qc_1(self):
