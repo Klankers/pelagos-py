@@ -71,9 +71,6 @@ class BaseQC:
     def __init__(self, data, **kwargs):
         self.data = data.copy(deep=True)
         
-        # Connect to the main pipeline logging hierarchy
-        self.logger = logging.getLogger(f"pelagos_py.pipeline.qc.{self.qc_name.replace(' ', '_')}")
-
         invalid_params = set(kwargs.keys()) - set(self.expected_parameters.keys())
         if invalid_params:
             raise KeyError(
@@ -87,6 +84,15 @@ class BaseQC:
             setattr(self, k, v)
 
         self.flags = None
+
+    @property
+    def logger(self):
+        #   Connect logger to the main pipeline logging hierarchy w/o having it get overwritten
+        if not hasattr(self, "_logger"):
+            self._logger = logging.getLogger(
+                f"pelagos_py.pipeline.qc.{self.qc_name.replace(' ', '_')}"
+            )
+        return self._logger
 
     def log(self, message):
         """Log an info-level message with the QC name prefix."""

@@ -60,7 +60,6 @@ class spike_qc(BaseQC):
 
     def __init__(self, data, **kwargs):
         #   Called when apply QC checks the required variables
-
         # Check the necessary kwargs are available
         required_kwargs = {
             "variables",
@@ -211,7 +210,8 @@ class spike_qc(BaseQC):
             if any(profile_flags == 0):
                 #   Values are not nan, but there are gaps in the profile detection
                 self.log_warn(
-                    f"Despike method '{self.method}' has untested data (flag 0={list(profile_flags).count(0)}) following the test for {var}. Consider running on full series or check profile numbers."
+                    f"Despike method '{self.method}' has untested data (flag 0={list(profile_flags).count(0)}) following the test for {var}.\n"
+                    f"Consider running on full series or check profile numbers."
                 )
 
             profile_flags = np.where(nan_mask, 9, 1)
@@ -285,7 +285,7 @@ class spike_qc(BaseQC):
             window_data = data[lo:hi]
             med = np.median(window_data)
             mad = np.median(np.abs(window_data - med))
-            if np.abs(data[i] - med) > k * scale * mad:
+            if np.abs(data[i] - med) > nsigma * scale * mad:
                 mask[i] = True
 
         return mask
@@ -295,7 +295,7 @@ class spike_qc(BaseQC):
 
         # If not plots were specified
         if len(self.plot) == 0:
-            print(
+            self.log_warn(
                 f"WARNING: In '{self.qc_name}', diagnostics were called but no variables were specified for plotting."
             )
             return
