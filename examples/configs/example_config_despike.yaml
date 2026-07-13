@@ -118,11 +118,10 @@ steps:
             variables:
               PRES: 2
               LATITUDE: 1
-            
             window_size: 10
             by_profile: True
             also_flag:
               PRES: [CNDC, TEMP]
               LATITUDE: [LONGITUDE]
-            plot: [PRES, LATITUDE]
+            plot:
     diagnostics: false

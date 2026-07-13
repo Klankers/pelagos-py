@@ -135,6 +135,8 @@ class spike_qc(BaseQC):
                     spike_flags = self.hampel_despike(
                         data=data_pass_on, window=self.window_size, nsigma=cond
                     )
+                else:
+                    raise ValueError(f"Unknown QC method: {self.method}")
 
                 new_flags[prof[0] : prof[1]] = spike_flags
 
@@ -209,7 +211,7 @@ class spike_qc(BaseQC):
         4 = Fail or bad
         9 = Missing
         """
-        from ioos_qc import spike_test as qartod_spike
+        from ioos_qc.qartod import spike_test as qartod_spike
 
         flags_qartod = qartod_spike(
             inp=data, fail_threshold=thresh, method="differential"
