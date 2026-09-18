@@ -1701,10 +1701,9 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
     pdf.add_page()
     pdf.section_heading("Glidertest Plots: Optics assessment")
 
-    breakpoint()
     data = data.set_coords("TIME")
     
-    #   This step has an output - capture it
+    #   This step has an output - capture it (eventually) and type it in underneat the figures.
     fig, __ = gtplots.process_optics_assess(ds=data)
     fig_name = f"{outdir}_optics_assess.png"
     fig.savefig(fig_name)
