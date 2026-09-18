@@ -1433,6 +1433,19 @@ def make_plots(
             bar.update(target - emitted)
             emitted = target
 
+def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
+    """
+    Function is in alpha.
+    
+    Runs plotting routines from `glidertest` and inserts them into the document.
+
+    clone glidertest, then install with `pip install -e .` until versioning is sorted out.
+    """
+    from glidertest import summary_sheet as gss
+    from glidertest import plots as gtplots
+
+    print("Glidertest section is runing - glidertest has been imported.")
+
 
 def cross_section_figure(data: xr.Dataset, outdir: str, ext: str = ".png") -> str:
     #   A4-portrait stack of PRES-vs-TIME panels (see _CROSS_SECTION_PANELS), one
@@ -1746,6 +1759,13 @@ class WriteDataReportPython(BaseStep):
             "default": None,
             "description": "Path to a logo image for the title page. Defaults to the NOC logo.",
         },
+        "show_glidertest": {
+            "type": bool,
+            "default": False,
+            "description": (
+                "Generate additional figures as done in glidertest's summary sheet."
+            )
+        }
     }
 
     def run(self) -> xr.DataArray:
@@ -1871,6 +1891,13 @@ class WriteDataReportPython(BaseStep):
             if self.parameters.get("show_qc_plots", True):
                 make_plots(pdf, data, outdir=fig_dir, bar=report_bar)
             report_bar.close()
+
+            if self.parameters.get("show_glidertest", True):
+                try:
+                    self.log("Generating figures from glidertest.")
+                    glidertest_section(pdf, data, fig_dir)
+                except ImportError as err:
+                    self.log_warn(f"`glidertest` not installed (err: {err}).\nSkipping glidertest figure generation.")
 
             if self.parameters.get("show_logs", True):
                 log_path = odir + self.context["global_parameters"]["log_file"]
