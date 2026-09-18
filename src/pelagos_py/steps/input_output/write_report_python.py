@@ -1496,7 +1496,9 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
     pdf.add_page()
     pdf.section_heading("Glidertest Plots: Day/night")
 
-    
+    #   Creates de421.bsp - not sure why
+    #   Getting this: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+    #   Figure seems fine when saved elsewhere
     fig, __ = gtplots.plot_daynight_avg(ds=data, var="CHLA")
     fig_name = f"{outdir}_daynight_avg_sal.png"
     fig.savefig(fig_name)
@@ -1511,6 +1513,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
     pdf.add_page()
     pdf.section_heading("Glidertest Plots: Hysteresis diagnostics")
 
+    #   Common error: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
     gss.create_hyst_plots(data, path=outdir)
     for fig_name in sorted(glob.glob(os.path.join(outdir, "*_hyst.png"))):
         pdf.image_fit(
@@ -1521,6 +1524,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
 
     pdf.add_page()
     pdf.section_heading("Glidertest Plots: Drift plots")
+    #   Has a writeout - need to caputre it
     gss.create_drift_plots(data, path=outdir)
     for fig_name in sorted(glob.glob(os.path.join(outdir, "*_drift.png"))):
         pdf.image_fit(
