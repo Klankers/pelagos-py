@@ -112,4 +112,4 @@ cython_debug/
 *.pot
 src/pelagos_py/_version.py
 .vscode/
-src/de421.bsp
+*.bsp
