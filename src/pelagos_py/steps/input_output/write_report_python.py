@@ -1506,7 +1506,15 @@ def glider_track_map(data: xr.Dataset, outdir: str, ext: str = ".png") -> str:
     #   The track's brightening gold already shows direction of travel (oldest
     #   faint -> newest bright), so no start/end/position marker is drawn.
 
-    fig.tight_layout(pad=0.3)
+    #   Margins are set by hand rather than with fig.tight_layout(). Cartopy's
+    #   gridline labels are drawn lazily at render time, so a GeoAxes carrying
+    #   them reports a non-finite tight bounding box; tight_layout divides by it
+    #   and silently parks the axes at a NaN position, after which the gridliner
+    #   builds the map boundary from NaN vertices and shapely raises
+    #   "Points of LinearRing do not form a closed linestring" inside savefig.
+    #   For the same reason, never save this figure with bbox_inches="tight".
+    #   left leaves room for the latitude labels, bottom for the longitude ones.
+    fig.subplots_adjust(left=0.10, right=0.97, bottom=0.04, top=0.98)
     fname = outdir + "glider_track" + ext
     plt.savefig(fname, dpi=200, facecolor=fig.get_facecolor())
     plt.close(fig)
