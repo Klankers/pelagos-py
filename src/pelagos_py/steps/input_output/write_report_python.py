@@ -1445,6 +1445,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
     from glidertest import plots as gtplots
 
     print("Glidertest section is runing - glidertest has been imported.")
+    breakpoint()
 
 
 def cross_section_figure(data: xr.Dataset, outdir: str, ext: str = ".png") -> str:
