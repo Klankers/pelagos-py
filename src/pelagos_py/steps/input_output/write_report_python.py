@@ -40,6 +40,8 @@ from fpdf.enums import (
 from fpdf.fonts import FontFace
 from datetime import datetime, timezone
 import getpass
+from glidertest import summary_sheet as gss
+from glidertest import plots as gtplots
 import glob
 import os
 import platform
@@ -1658,21 +1660,27 @@ def make_plots(
 
 def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
     """
-    Function is in alpha.
-    
     Runs plotting routines from `glidertest` and inserts them into the document.
-
-    clone glidertest, then install with `pip install -e .` until versioning is sorted out.
     """
-    from glidertest import summary_sheet as gss
-    from glidertest import plots as gtplots
 
     print("Glidertest section is running - glidertest has been imported.")
 
+    #   Glidertest requires certain names for salinity, DO variables
+    #   Units should be handled appropriately in var attributes
+    required_vars = {
+        "PSAL": ["PRAC_SALINITY", "CTDSAL"],
+        "DOXY": ["MOLAR_DOXY", "OXYGEN_CONCENTRATION"]
+    }
+    for target, sources in required_vars.items():
+        if target not in data.data_vars:
+            for source in sources:
+                if source in data.data_vars:
+                    data[target] = data[source]
+                else:
+                    print(f"Could not find {target} equivalent in data.")
+
     pdf.add_page()
     pdf.section_heading("Glidertest Plots: Basic Variables")
-    if "PSAL" not in data.data_vars:
-        data["PSAL"] = data["PRAC_SALINITY"]
 
     fig, __ = gtplots.plot_basic_vars(ds=data)
     fig_name = f"{outdir}_basic_vars.png"
@@ -1686,9 +1694,6 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
 
     pdf.add_page()
     pdf.section_heading("Glidertest Plots: Up/Down bias")
-
-    if "DOXY" not in data.data_vars:
-        data["DOXY"] = ["MOLAR_DOXY"]   #   Units should be accounted for in var attribute
 
     for var in ["TEMP", "CNDC", "DOXY"]:
         fig, __ = gtplots.plot_updown_bias(data, var=var)
