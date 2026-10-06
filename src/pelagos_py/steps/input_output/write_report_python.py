@@ -1687,6 +1687,9 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
     pdf.add_page()
     pdf.section_heading("Glidertest Plots: Up/Down bias")
 
+    if "DOXY" not in data.data_vars:
+        data["DOXY"] = ["MOLAR_DOXY"]   #   Units should be accounted for in var attribute
+
     for var in ["TEMP", "CNDC", "DOXY"]:
         fig, __ = gtplots.plot_updown_bias(data, var=var)
         fig_name = f"{outdir}{var}_updown.png"
@@ -1701,7 +1704,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
     pdf.add_page()
     pdf.section_heading("Glidertest Plots: Optics assessment")
 
-    data = data.set_coords("TIME")
+    data = data.set_coords(["TIME", "DEPTH"])
     
     #   This step has an output - capture it (eventually) and type it in underneat the figures.
     fig, __ = gtplots.process_optics_assess(ds=data)
