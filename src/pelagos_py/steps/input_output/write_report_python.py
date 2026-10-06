@@ -1671,6 +1671,8 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
         "PSAL": ["PRAC_SALINITY", "CTDSAL"],
         "DOXY": ["MOLAR_DOXY", "OXYGEN_CONCENTRATION"]
     }
+    data = data.set_coords(["TIME", "DEPTH"])
+    
     for target, sources in required_vars.items():
         if target not in data.data_vars:
             for source in sources:
@@ -1679,87 +1681,103 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
                 else:
                     print(f"Could not find {target} equivalent in data.")
 
-    pdf.add_page()
-    pdf.section_heading("Glidertest Plots: Basic Variables")
-
-    fig, __ = gtplots.plot_basic_vars(ds=data)
-    fig_name = f"{outdir}_basic_vars.png"
-    fig.savefig(fig_name)
-    plt.close(fig)
-    pdf.image_fit(
-        fig_name,
-        aspect=_image_aspect(fig_name),
-        max_h=100
-    )
-
-    pdf.add_page()
-    pdf.section_heading("Glidertest Plots: Up/Down bias")
-
-    for var in ["TEMP", "CNDC", "DOXY"]:
-        fig, __ = gtplots.plot_updown_bias(data, var=var)
-        fig_name = f"{outdir}{var}_updown.png"
+    try:
+        fig, __ = gtplots.plot_basic_vars(ds=data)
+        fig_name = f"{outdir}_basic_vars.png"
         fig.savefig(fig_name)
         plt.close(fig)
+
+        pdf.add_page()
+        pdf.section_heading("Glidertest Plots: Basic Variables")
         pdf.image_fit(
             fig_name,
             aspect=_image_aspect(fig_name),
-            max_h=100,
+            max_h=100
         )
-
-    pdf.add_page()
-    pdf.section_heading("Glidertest Plots: Optics assessment")
-
-    data = data.set_coords(["TIME", "DEPTH"])
+    except Exception as err:
+        print(f"Glidertest failed on Basic Variable plotting: {err}")
     
-    #   This step has an output - capture it (eventually) and type it in underneat the figures.
-    fig, __ = gtplots.process_optics_assess(ds=data)
-    fig_name = f"{outdir}_optics_assess.png"
-    fig.savefig(fig_name)
-    plt.close(fig)
-    pdf.image_fit(
-        fig_name,
-        aspect=_image_aspect(fig_name),
-        max_h=100
-    )
 
-    pdf.add_page()
-    pdf.section_heading("Glidertest Plots: Day/night")
+    try:
+        #   This is the only routine that will print the page even when failing due to the loop
+        pdf.add_page()
+        pdf.section_heading("Glidertest Plots: Up/Down Bias")
 
-    #   Getting this: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
-    #   Figure seems fine when saved elsewhere
-    fig, __ = gtplots.plot_daynight_avg(ds=data, var="CHLA")
-    fig_name = f"{outdir}_daynight_avg_sal.png"
-    fig.savefig(fig_name)
-    plt.close(fig)
-    pdf.image_fit(
-        fig_name,
-        aspect=_image_aspect(fig_name),
-        max_h=100
-    )
+        for var in ["TEMP", "CNDC", "DOXY"]:
+            fig, __ = gtplots.plot_updown_bias(data, var=var)
+            fig_name = f"{outdir}{var}_updown.png"
+            fig.savefig(fig_name)
+            plt.close(fig)
+            pdf.image_fit(
+                fig_name,
+                aspect=_image_aspect(fig_name),
+                max_h=100,
+            )
+    except Exception as err:
+        print(f"Glidertest failed on Up/Down Bias plotting: {err}")
 
-    #   Summary sheet batch plots (do not export fig, ax)
-    pdf.add_page()
-    pdf.section_heading("Glidertest Plots: Hysteresis diagnostics")
+    try:
+        #   This step has an output - capture it (eventually) and type it in underneat the figures.
+        fig, __ = gtplots.process_optics_assess(ds=data)
+        fig_name = f"{outdir}_optics_assess.png"
+        fig.savefig(fig_name)
+        plt.close(fig)
 
-    #   Common error: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
-    gss.create_hyst_plots(data, path=outdir)
-    for fig_name in sorted(glob.glob(os.path.join(outdir, "*_hyst.png"))):
+        pdf.add_page()
+        pdf.section_heading("Glidertest Plots: Optics Assessment")
         pdf.image_fit(
             fig_name,
             aspect=_image_aspect(fig_name),
-            max_h=100,
+            max_h=100
         )
+    except Exception as err:
+        print(f"Glidertest failed on Optics Assessment plotting: {err}")
 
-    pdf.add_page()
-    pdf.section_heading("Glidertest Plots: Drift plots")
-    #   Has a writeout - need to caputre it
-    gss.create_drift_plots(data, path=outdir)
-    for fig_name in sorted(glob.glob(os.path.join(outdir, "*_drift.png"))):
+    try:
+        fig, __ = gtplots.plot_daynight_avg(ds=data, var="CHLA")
+        fig_name = f"{outdir}_daynight_avg_chla.png"
+        fig.savefig(fig_name)
+        plt.close(fig)
+        pdf.add_page()
+        pdf.section_heading("Glidertest Plots: Day/Night")
+
         pdf.image_fit(
             fig_name,
             aspect=_image_aspect(fig_name),
-            max_h=100,
+            max_h=100
         )
+    except Exception as err:
+        print(f"Glidertest failed on Day/Night plotting: {err}")
+
+    try:
+        gss.create_hyst_plots(data, path=outdir)
+        #   Summary sheet batch plots (do not export fig, ax)
+        pdf.add_page()
+        pdf.section_heading("Glidertest Plots: Hysteresis diagnostics")
+       
+        for fig_name in sorted(glob.glob(os.path.join(outdir, "*_hyst.png"))):
+            pdf.image_fit(
+                fig_name,
+                aspect=_image_aspect(fig_name),
+                max_h=100,
+            )
+    except Exception as err:
+        print(f"Glidertest failed on Hysteresis plotting: {err}")
+
+    try:
+        gss.create_drift_plots(data, path=outdir)
+        pdf.add_page()
+        pdf.section_heading("Glidertest Plots: Drift plots")
+        
+        for fig_name in sorted(glob.glob(os.path.join(outdir, "*_drift.png"))):
+            pdf.image_fit(
+                fig_name,
+                aspect=_image_aspect(fig_name),
+                max_h=100,
+            )
+    except Exception as err:
+        print(f"Glidertest failed on Drift plotting: {err}")
+
 
 def cross_section_figure(data: xr.Dataset, outdir: str, ext: str = ".png") -> str:
     #   A4-portrait stack of PRES-vs-TIME panels (see _CROSS_SECTION_PANELS), one
@@ -2207,12 +2225,9 @@ class WriteDataReportPython(BaseStep):
             report_bar.close()
 
             if self.parameters.get("show_glidertest", True):
-                try:
-                    self.log("Generating figures from glidertest.")
-                    glidertest_section(pdf, data, fig_dir)
-                except ImportError as err:
-                    self.log_warn(f"`glidertest` not installed (err: {err}).\nSkipping glidertest figure generation.")
-
+                self.log("Generating figures from glidertest.")
+                glidertest_section(pdf, data, fig_dir)
+                
             if self.parameters.get("show_logs", True):
                 log_path = odir + self.context["global_parameters"]["log_file"]
                 add_log(log_path, pdf)
