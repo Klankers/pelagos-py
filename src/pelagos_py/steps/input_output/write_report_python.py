@@ -1757,14 +1757,14 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
 
     #   Chlorophyll quenching
     try:
-        pdf.add_page()
-        pdf.section_heading("Glidertest Plots: Chlorophyll Quench Assessment")
-
         if "CHLA" in data.data_vars:
             fig, __ = gtplots.plot_quench_assess(ds=data, sel_var="CHLA")
             fig_name = f"{outdir}chla_quench_assess.png"
             fig.savefig(fig_name)
             plt.close(fig)
+
+            pdf.add_page()
+            pdf.section_heading("Glidertest Plots: Chlorophyll Quench Assessment")
 
             pdf.image_fit(
                 fig_name,
@@ -1775,6 +1775,26 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
             log_warn("CHLA not in data variables. Check alternatives or sensors for this glider.")
     except Exception as err:
         log_warn(f"Glidertest failed on Chloropphyll Quench Assessment plotting: {err}")
+
+    #   Sensor temporal drift
+    #   Note: Time intensive
+    try:
+        pdf.add_page()
+        pdf.section_heading("Glidertest Plots: Temporal Drift by Variable")
+
+        for var in ["CNDC", "PSAL", "DOXY"]:
+            fig, __ = gtplots.check_temporal_drift(ds=data, var=var)
+            fig_name = f"{outdir}{var}_temporal_drift_check.png"
+            fig.savefig(fig_name)
+            plt.close(fig)
+            
+            pdf.image_fit(
+                fig_name,
+                aspect=_image_aspect(fig_name),
+                max_h=100,
+            )
+    except Exception as err:
+        log_warn(f"Glidertest failed on Sensor Temporal Drift plotting: {err}")
 
     #   (GSS) Hysteresis assessment
     try:
@@ -1805,7 +1825,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
                 max_h=100,
             )
     except Exception as err:
-        log_warn(f"Glidertest failed on Drift plotting: {err}")
+        log_warn(f"Glidertest failed on Drift plotting (GSS): {err}")
 
     log("Glidertest section written out.")
 
