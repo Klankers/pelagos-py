@@ -1681,6 +1681,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
             if target not in data.data_vars:
                 log_warn(f"Could not find {target} equivalent in data.")
 
+    #   Basic variables
     try:
         fig, __ = gtplots.plot_basic_vars(ds=data)
         fig_name = f"{outdir}basic_vars.png"
@@ -1697,7 +1698,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     except Exception as err:
         log_warn(f"Glidertest failed on Basic Variable plotting: {err}")
     
-
+    #   Up/down bias
     try:
         #   This is the only routine that will print the page even when failing due to the loop
         pdf.add_page()
@@ -1717,6 +1718,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     except Exception as err:
         log_warn(f"Glidertest failed on Up/Down Bias plotting: {err}")
 
+    #   Assessing optics
     try:
         #   This step has an output - capture it (eventually) and type it in underneat the figures.
         fig, __ = gtplots.process_optics_assess(ds=data)
@@ -1734,6 +1736,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     except Exception as err:
         log_warn(f"Glidertest failed on Optics Assessment plotting: {err}")
 
+    #   Day/Night for influenced variables
     try:
         pdf.add_page()
         pdf.section_heading("Glidertest Plots: Day/Night")
@@ -1752,11 +1755,33 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     except Exception as err:
         log_warn(f"Glidertest failed on Day/Night plotting: {err}")
 
+    #   Chlorophyll quenching
+    try:
+        pdf.add_page()
+        pdf.section_heading("Glidertest Plots: Chlorophyll Quench Assessment")
+
+        if "CHLA" in data.data_vars:
+            fig, __ = gtplots.plot_quench_assess(ds=data, sel_var="CHLA")
+            fig_name = f"{outdir}chla_quench_assess.png"
+            fig.savefig(fig_name)
+            plt.close(fig)
+
+            pdf.image_fit(
+                fig_name,
+                aspect=_image_aspect(fig_name),
+                max_h=100
+            )
+        else:
+            log_warn("CHLA not in data variables. Check alternatives or sensors for this glider.")
+    except Exception as err:
+        log_warn(f"Glidertest failed on Chloropphyll Quench Assessment plotting: {err}")
+
+    #   (GSS) Hysteresis assessment
     try:
         gss.create_hyst_plots(data, path=outdir)
         #   Summary sheet batch plots (do not export fig, ax)
         pdf.add_page()
-        pdf.section_heading("Glidertest Plots: Hysteresis diagnostics")
+        pdf.section_heading("Glidertest Plots: (GSS) Hysteresis diagnostics")
        
         for fig_name in sorted(glob.glob(os.path.join(outdir, "*_hyst.png"))):
             pdf.image_fit(
@@ -1767,10 +1792,11 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     except Exception as err:
         log_warn(f"Glidertest failed on Hysteresis plotting: {err}")
 
+    #   (GSS) Optical sensor drift plots
     try:
         gss.create_drift_plots(data, path=outdir)
         pdf.add_page()
-        pdf.section_heading("Glidertest Plots: Drift plots")
+        pdf.section_heading("Glidertest Plots: (GSS) Optical Drift plots")
         
         for fig_name in sorted(glob.glob(os.path.join(outdir, "*_drift.png"))):
             pdf.image_fit(
