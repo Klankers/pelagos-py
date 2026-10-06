@@ -1667,20 +1667,23 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     #   Units should be handled appropriately in var attributes
     required_vars = {
         "PSAL": ["PRAC_SALINITY", "CTDSAL"],
-        "DOXY": ["MOLAR_DOXY", "OXYGEN_CONCENTRATION"]
+        "DOXY": ["MOLAR_DOXY", "OXYGEN_CONCENTRATION"],
+        "DPAR": ["downwelling_PAR"],
     }
     data = data.set_coords(["TIME", "DEPTH"])
-    for target, sources in required_vars.items():
+    for target, other_names in required_vars.items():
         if target not in data.data_vars:
-            for source in sources:
-                if source in data.data_vars:
-                    data[target] = data[source]
-                else:
-                    log_warn(f"Could not find {target} equivalent in data.")
+            for name in other_names:
+                if name in data.data_vars:
+                    data[target] = data[name]
+                    log(f"{target} now in data - using {name}.")
+                    break      
+            if target not in data.data_vars:
+                log_warn(f"Could not find {target} equivalent in data.")
 
     try:
         fig, __ = gtplots.plot_basic_vars(ds=data)
-        fig_name = f"{outdir}_basic_vars.png"
+        fig_name = f"{outdir}basic_vars.png"
         fig.savefig(fig_name)
         plt.close(fig)
 
@@ -1700,6 +1703,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
         pdf.add_page()
         pdf.section_heading("Glidertest Plots: Up/Down Bias")
 
+        #   TODO: Pull these out as a config option.
         for var in ["TEMP", "CNDC", "DOXY"]:
             fig, __ = gtplots.plot_updown_bias(data, var=var)
             fig_name = f"{outdir}{var}_updown.png"
@@ -1716,7 +1720,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     try:
         #   This step has an output - capture it (eventually) and type it in underneat the figures.
         fig, __ = gtplots.process_optics_assess(ds=data)
-        fig_name = f"{outdir}_optics_assess.png"
+        fig_name = f"{outdir}optics_assess.png"
         fig.savefig(fig_name)
         plt.close(fig)
 
@@ -1731,18 +1735,20 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
         log_warn(f"Glidertest failed on Optics Assessment plotting: {err}")
 
     try:
-        fig, __ = gtplots.plot_daynight_avg(ds=data, var="CHLA")
-        fig_name = f"{outdir}_daynight_avg_chla.png"
-        fig.savefig(fig_name)
-        plt.close(fig)
         pdf.add_page()
         pdf.section_heading("Glidertest Plots: Day/Night")
+        for var in ["CHLA", "CDOM", "DPAR", "DOXY"]:    #   TODO: Pull these out into yaml
+            if var in data.data_vars:
+                fig, __ = gtplots.plot_daynight_avg(ds=data, var=var)
+                fig_name = f"{outdir}daynight_avg_{var}.png"
+                fig.savefig(fig_name)
+                plt.close(fig)
 
-        pdf.image_fit(
-            fig_name,
-            aspect=_image_aspect(fig_name),
-            max_h=100
-        )
+                pdf.image_fit(
+                    fig_name,
+                    aspect=_image_aspect(fig_name),
+                    max_h=100
+                )
     except Exception as err:
         log_warn(f"Glidertest failed on Day/Night plotting: {err}")
 
