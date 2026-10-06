@@ -1832,6 +1832,24 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     except Exception as err:
         log_warn(f"Glidertest failed on Sample Period plotting: {err}")
 
+    #   TS plot with 2D density
+    try:
+        fig, __ = gtplots.plot_ts(ds=data)
+        fig_name = f"{outdir}ts.png"
+        fig.savefig(fig_name)
+        plt.close(fig)
+
+        pdf.add_page()
+        pdf.section_heading("Glidertest Plots: Temperature-Salinity (TS)")
+        
+        pdf.image_fit(
+            fig_name,
+            aspect=_image_aspect(fig_name),
+            max_h=100,
+        )
+    except Exception as err:
+        log_warn(f"Glidertest failed on TS plotting: {err}")
+
     #   (GSS) Hysteresis assessment
     try:
         gss.create_hyst_plots(data, path=outdir)
