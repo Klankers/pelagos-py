@@ -1658,12 +1658,10 @@ def make_plots(
             bar.update(target - emitted)
             emitted = target
 
-def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
+def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print, log_warn=print) -> None:
     """
     Runs plotting routines from `glidertest` and inserts them into the document.
     """
-
-    print("Glidertest section is running - glidertest has been imported.")
 
     #   Glidertest requires certain names for salinity, DO variables
     #   Units should be handled appropriately in var attributes
@@ -1672,14 +1670,13 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
         "DOXY": ["MOLAR_DOXY", "OXYGEN_CONCENTRATION"]
     }
     data = data.set_coords(["TIME", "DEPTH"])
-    
     for target, sources in required_vars.items():
         if target not in data.data_vars:
             for source in sources:
                 if source in data.data_vars:
                     data[target] = data[source]
                 else:
-                    print(f"Could not find {target} equivalent in data.")
+                    log_warn(f"Could not find {target} equivalent in data.")
 
     try:
         fig, __ = gtplots.plot_basic_vars(ds=data)
@@ -1695,7 +1692,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
             max_h=100
         )
     except Exception as err:
-        print(f"Glidertest failed on Basic Variable plotting: {err}")
+        log_warn(f"Glidertest failed on Basic Variable plotting: {err}")
     
 
     try:
@@ -1714,7 +1711,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
                 max_h=100,
             )
     except Exception as err:
-        print(f"Glidertest failed on Up/Down Bias plotting: {err}")
+        log_warn(f"Glidertest failed on Up/Down Bias plotting: {err}")
 
     try:
         #   This step has an output - capture it (eventually) and type it in underneat the figures.
@@ -1731,7 +1728,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
             max_h=100
         )
     except Exception as err:
-        print(f"Glidertest failed on Optics Assessment plotting: {err}")
+        log_warn(f"Glidertest failed on Optics Assessment plotting: {err}")
 
     try:
         fig, __ = gtplots.plot_daynight_avg(ds=data, var="CHLA")
@@ -1747,7 +1744,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
             max_h=100
         )
     except Exception as err:
-        print(f"Glidertest failed on Day/Night plotting: {err}")
+        log_warn(f"Glidertest failed on Day/Night plotting: {err}")
 
     try:
         gss.create_hyst_plots(data, path=outdir)
@@ -1762,7 +1759,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
                 max_h=100,
             )
     except Exception as err:
-        print(f"Glidertest failed on Hysteresis plotting: {err}")
+        log_warn(f"Glidertest failed on Hysteresis plotting: {err}")
 
     try:
         gss.create_drift_plots(data, path=outdir)
@@ -1776,7 +1773,9 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str) -> None:
                 max_h=100,
             )
     except Exception as err:
-        print(f"Glidertest failed on Drift plotting: {err}")
+        log_warn(f"Glidertest failed on Drift plotting: {err}")
+
+    log("Glidertest section written out.")
 
 
 def cross_section_figure(data: xr.Dataset, outdir: str, ext: str = ".png") -> str:
@@ -2226,7 +2225,7 @@ class WriteDataReportPython(BaseStep):
 
             if self.parameters.get("show_glidertest", True):
                 self.log("Generating figures from glidertest.")
-                glidertest_section(pdf, data, fig_dir)
+                glidertest_section(pdf, data, fig_dir, log=self.log, log_warn=self.log_warn)
                 
             if self.parameters.get("show_logs", True):
                 log_path = odir + self.context["global_parameters"]["log_file"]
