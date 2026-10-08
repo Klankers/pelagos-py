@@ -1793,23 +1793,23 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
 
     #   Sensor temporal drift
     #   Note: Time intensive
-    try:
-        pdf.add_page()
-        pdf.section_heading("Glidertest Plots: Temporal Drift by Variable")
+    # try:
+    #     pdf.add_page()
+    #     pdf.section_heading("Glidertest Plots: Temporal Drift by Variable")
 
-        for var in ["CNDC", "PSAL", "DOXY"]:
-            fig, __ = gtplots.check_temporal_drift(ds=data, var=var)
-            fig_name = f"{outdir}{var}_temporal_drift_check.png"
-            fig.savefig(fig_name)
-            plt.close(fig)
+    #     for var in ["CNDC", "PSAL", "DOXY"]:
+    #         fig, __ = gtplots.check_temporal_drift(ds=data, var=var)
+    #         fig_name = f"{outdir}{var}_temporal_drift_check.png"
+    #         fig.savefig(fig_name)
+    #         plt.close(fig)
             
-            pdf.image_fit(
-                fig_name,
-                aspect=_image_aspect(fig_name),
-                max_h=100,
-            )
-    except Exception as err:
-        log_warn(f"Glidertest failed on Sensor Temporal Drift plotting: {err}")
+    #         pdf.image_fit(
+    #             fig_name,
+    #             aspect=_image_aspect(fig_name),
+    #             max_h=100,
+    #         )
+    # except Exception as err:
+    #     log_warn(f"Glidertest failed on Sensor Temporal Drift plotting: {err}")
 
     #   Grid spacing
     try:
@@ -1864,6 +1864,25 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
         )
     except Exception as err:
         log_warn(f"Glidertest failed on TS plotting: {err}")
+
+    #   Day/Night for influenced variables
+    try:
+        pdf.add_page()
+        pdf.section_heading("Glidertest Plots: Hysteresis")
+        for var in ["TEMP", "CNDC", "DOXY",]:    #   TODO: Pull these out into yaml
+            if var in data.data_vars:
+                fig, __ = gtplots.plot_hysteresis(ds=data, var=var)
+                fig_name = f"{outdir}hysteresis_{var}.png"
+                fig.savefig(fig_name)
+                plt.close(fig)
+
+                pdf.image_fit(
+                    fig_name,
+                    aspect=_image_aspect(fig_name),
+                    max_h=100
+                )
+    except Exception as err:
+        log_warn(f"Glidertest failed on Hysteresis plotting: {err}")
 
     log("Glidertest section written out.")
 
