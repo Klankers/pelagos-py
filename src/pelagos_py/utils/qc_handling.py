@@ -292,5 +292,5 @@ class QCHandlingMixin:
         for name, attrs in attrs_before.items():
             if name in self.data.variables:
                 if self.data[name].attrs != attrs:
-                    self.logwarn(f"Attributes when initializing QC do not match:\n{self.data[name].attrs}\n{attrs}")
+                    self.log_warn(f"Attributes when initializing QC do not match:\n{self.data[name].attrs}\n{attrs}")
                 # self.data[name].attrs = attrs
