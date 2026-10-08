@@ -1865,7 +1865,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     except Exception as err:
         log_warn(f"Glidertest failed on TS plotting: {err}")
 
-    #   Day/Night for influenced variables
+    #   Hysteresis for known sensors
     try:
         pdf.add_page()
         pdf.section_heading("Glidertest Plots: Hysteresis")
@@ -1884,7 +1884,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     except Exception as err:
         log_warn(f"Glidertest failed on Hysteresis plotting: {err}")
 
-    #   Day/Night for influenced variables
+    #   Global range figures
     try:
         pdf.add_page()
         pdf.section_heading("Glidertest Plots: Global Range")
@@ -1906,6 +1906,28 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
                 pdf.body(f"{var} ranges: {min_val} to {max_val} ({data[var].attrs["units"]}).")
     except Exception as err:
         log_warn(f"Glidertest failed on Global Range plotting: {err}")
+
+    #   Max depth for individual profiles
+    try:
+        breakpoint()
+        fig, __ = gtplots.plot_max_depth_per_profile(
+            ds=data,
+            bins=20,    #   For shallow profiles - could use bins = max(data["DEPTH"])
+        )
+        fig_name = f"{outdir}profile_depths.png"
+        fig.savefig(fig_name)
+        plt.close(fig)
+
+        pdf.add_page()
+        pdf.section_heading("Glidertest Plots: Profile Depths")
+        
+        pdf.image_fit(
+            fig_name,
+            aspect=_image_aspect(fig_name),
+            max_h=100,
+        )
+    except Exception as err:
+        log_warn(f"Glidertest failed on Profile Depth plotting: {err}")
 
     log("Glidertest section written out.")
 
