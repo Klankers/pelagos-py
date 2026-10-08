@@ -40,7 +40,6 @@ from fpdf.enums import (
 from fpdf.fonts import FontFace
 from datetime import datetime, timezone
 import getpass
-from glidertest import summary_sheet as gss
 from glidertest import plots as gtplots
 import glob
 import os
@@ -1849,37 +1848,6 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
         )
     except Exception as err:
         log_warn(f"Glidertest failed on TS plotting: {err}")
-
-    #   (GSS) Hysteresis assessment
-    try:
-        gss.create_hyst_plots(data, path=outdir)
-        #   Summary sheet batch plots (do not export fig, ax)
-        pdf.add_page()
-        pdf.section_heading("Glidertest Plots: (GSS) Hysteresis diagnostics")
-       
-        for fig_name in sorted(glob.glob(os.path.join(outdir, "*_hyst.png"))):
-            pdf.image_fit(
-                fig_name,
-                aspect=_image_aspect(fig_name),
-                max_h=100,
-            )
-    except Exception as err:
-        log_warn(f"Glidertest failed on Hysteresis plotting: {err}")
-
-    #   (GSS) Optical sensor drift plots
-    try:
-        gss.create_drift_plots(data, path=outdir)
-        pdf.add_page()
-        pdf.section_heading("Glidertest Plots: (GSS) Optical Drift plots")
-        
-        for fig_name in sorted(glob.glob(os.path.join(outdir, "*_drift.png"))):
-            pdf.image_fit(
-                fig_name,
-                aspect=_image_aspect(fig_name),
-                max_h=100,
-            )
-    except Exception as err:
-        log_warn(f"Glidertest failed on Drift plotting (GSS): {err}")
 
     log("Glidertest section written out.")
 
