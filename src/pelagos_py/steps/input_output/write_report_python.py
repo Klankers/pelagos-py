@@ -1884,6 +1884,29 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     except Exception as err:
         log_warn(f"Glidertest failed on Hysteresis plotting: {err}")
 
+    #   Day/Night for influenced variables
+    try:
+        pdf.add_page()
+        pdf.section_heading("Glidertest Plots: Global Range")
+        for var in ["TEMP", "CNDC", "DOXY",]:    #   TODO: Pull these out into yaml
+            if var in data.data_vars:
+                #   Just using the "bad" bounds, extracted from config stashed in QC variable
+                params = json.loads(data[var+"_QC"].attrs["range_qc_params"])['variable_ranges'][var]['4']
+                min_val, max_val = params[0:2]
+                fig, __ = gtplots.plot_global_range(ds=data, var=var, min_val=min_val, max_val=max_val)
+                fig_name = f"{outdir}global_range_{var}.png"
+                fig.savefig(fig_name)
+                plt.close(fig)
+
+                pdf.image_fit(
+                    fig_name,
+                    aspect=_image_aspect(fig_name),
+                    max_h=100
+                )
+                pdf.body(f"{var} ranges: {min_val} to {max_val} ({data[var].attrs["units"]}).")
+    except Exception as err:
+        log_warn(f"Glidertest failed on Global Range plotting: {err}")
+
     log("Glidertest section written out.")
 
 
