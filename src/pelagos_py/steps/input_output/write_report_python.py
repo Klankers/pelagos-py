@@ -41,7 +41,6 @@ from fpdf.fonts import FontFace
 from datetime import datetime, timezone
 import getpass
 from glidertest import plots as gtplots
-import glob
 import os
 import platform
 import json
