@@ -1679,7 +1679,24 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
             if target not in data.data_vars:
                 log_warn(f"Could not find {target} equivalent in data.")
 
-    #   Basic variables
+    #   Glider track - comparable to `glider_track_map` above
+    try:
+        fig, __ = gtplots.plot_glider_track(ds=data)
+        fig_name = f"{outdir}glider_track_glidertest.png"
+        fig.savefig(fig_name)
+        plt.close(fig)
+
+        pdf.add_page()
+        pdf.section_heading("Glidertest Plots: Glider Mission Track")
+        pdf.image_fit(
+            fig_name,
+            aspect=_image_aspect(fig_name),
+            max_h=100
+        )
+    except Exception as err:
+        log_warn(f"Glidertest failed on Glider Track plotting: {err}")
+
+    #   Basic variables: T, S, DO, CHLA
     try:
         fig, __ = gtplots.plot_basic_vars(ds=data)
         fig_name = f"{outdir}basic_vars.png"
