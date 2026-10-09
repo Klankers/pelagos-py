@@ -1672,9 +1672,16 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     #   Glidertest requires certain names for salinity, DO variables
     #   Units should be handled appropriately in var attributes
     required_vars = {
-        "PSAL": ["PRAC_SALINITY", "CTDSAL"],
-        "DOXY": ["MOLAR_DOXY", "OXYGEN_CONCENTRATION"],
-        "DPAR": ["downwelling_PAR"],
+        "PSAL": ["PRAC_SALINITY", "CTDSAL", "SALINITY"],
+        "DOXY": [
+            "OXYGEN_CONCENTRATION",
+            "MOLAR_DOXY_ADJUSTED",
+            "MOLAR_DOXY_PSAL_PRES",
+            "MOLAR_DOXY_PSAL",
+            "MOLAR_DOXY", "molar_doxy",
+            "molar_deoxy",
+            ],
+        "DPAR": ["downwelling_PAR", "DOWNWELLING_PAR", "downwelling_par"],
     }
     data = data.set_coords(["TIME", "DEPTH"])
     for target, other_names in required_vars.items():
