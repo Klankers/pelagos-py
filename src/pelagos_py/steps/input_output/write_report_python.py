@@ -1027,7 +1027,7 @@ def qc_section(pdf: ReportPDF, data: xr.Dataset) -> None:
 
     qc_dict = build_qc_dict(data)
 
-    if not qc_dict:
+    if not any(qc_dict.values()):
         pdf.body("No QC tests found.")
         return
 
