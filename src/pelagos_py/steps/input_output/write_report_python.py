@@ -921,61 +921,72 @@ def diagnostics_section(pdf: ReportPDF, captured: list) -> None:
         for img in images:
             pdf.image_fit(img, aspect=_image_aspect(img), max_h=max_h)
 
-def qc_status(flag_counts, n_points):
+def qc_status(flag_counts: dict):
     """
     Return the stoplight status and whether flag 8 occurred.
     
-    Note that interpolated points, flagged as 8, should not be considered either good or bad.
     Any variable can include a flag 8 - it's handy to denote this differently than by color.
 
-    This is mostly chosen arbitrarily and could be updated as a global attribute of tolerances.
-    * Grey - either no QC was done (all flagged as 0) or the points are NaN.
-    * Black - all of the points are some degree of bad.    
-    * Green - the opposite - all of the points are some degree of good.
-    * Red - when a large portion of the data points (over 2%) are bad.
-    * Orange - getting risky, where up to 2% of the data points are bad or suspect.
-    * Yellow - better for picking up small instances. Up to about 50 flags. Overwrite to orange.
-    """
+    Argo flags 0, 8, and 9 can't be considered as "good" or "bad" and therefore should be excluded from the % good spectrum.
 
+    This spectrum is (arbitrarily) assigned as follows:
+    * Grey - no evaluated points remain after excluding flags 0, 8, and 9.
+    * Green - all evaluated points are good or probably good (flags 1, 2).
+    * Yellow - up to `yellow_pts` evaluated points are bad or have another non-good flag, with fewer than `orange_per` bad.
+    * Orange - more than `yellow_pts` evaluated points are bad or have another non-good flag, with fewer than `orange_per` bad.
+    * Red - at least `orange_per` of evaluated points are bad, but not all are bad.
+    * Black - all evaluated points are bad (flags 3, 4).
+    
+    In the future, these flag tolerances could be an optional kwarg that the user could specify in their configuration yaml.
+    """
+    yellow_pts = 50     #   Number of *points* distinguishing yellow to orange
+    orange_per = 0.02   #   Fraction of evaluated data points that distinguishes orange from red
+    
     counts = {
         int(flag): int(count)
         for flag, count in flag_counts.items()
     }
+    has_flag_8 = counts.get(8, 0) > 0   #   If any 8 flags are found, return this bool to denote special formatting
 
-    n_bad = counts.get(3, 0) + counts.get(4, 0)
-    has_flag_8 = counts.get(8, 0) > 0
-
-    # Flags that actually occurred.
+    #   Trim down to flags that actually occurred.
     active_flags = {
         flag
         for flag, count in counts.items()
         if count > 0
     }
-    if active_flags <= {0, 9}:
+    evaluated_flags = active_flags & set(range(1, 8))
+    #   Otherwise it's all 0, 8, and 9
+    if not evaluated_flags:
         return "grey", has_flag_8
 
-    # Every evaluated point failed the test.
-    # Flag 8 is allowed here because it is only a modifier.
-    if active_flags <= {3, 4, 8} and n_bad > 0:
-        return "black", has_flag_8
+    #   Working with valid flag values - can be a subset of N_MEASUREMENTS.size
+    n_evaluated = sum(counts.get(flag, 0) for flag in range(1, 8))
+    n_bad = counts.get(3, 0) + counts.get(4, 0)
 
-    if active_flags <= {1, 2, 8}:
+    if evaluated_flags <= {1, 2}:
         return "green", has_flag_8
-    if n_bad / n_points >= 0.02:
-        return "red", has_flag_8
-    if n_bad <= 50:
+
+    #   Working with any amount of questionable points
+    bad_fraction = n_bad / n_evaluated
+    if n_bad <= yellow_pts and bad_fraction < orange_per:
         return "yellow", has_flag_8
-    #   More than 50 bad points but less than 2%.
-    return "orange", has_flag_8
+    if bad_fraction < orange_per:
+        return "orange", has_flag_8
+    if n_bad < n_evaluated:
+        return "red", has_flag_8
+    return "black", has_flag_8
 
 
-def build_qc_stoplight_summary(qc_dict, n_points):
+def build_qc_stoplight_summary(qc_dict: dict, n_points: int):
     """Build a flaxible matrix of QC methods and variables
     
     For each method picked out of the qc_dict, add that to the columns in `tests`.
     For each variable, add that to the rows. Then assess the contents of QC dict for each
     column in the row with qc_status to assign the stoplight for the cell.
     """
+    if n_points == 0:
+        msg = "Number of points passed into QC stoplight summary is not able to be evaluated."
+        raise ValueError(msg)
 
     # fromkeys - preserves list order
     tests = list(dict.fromkeys(
@@ -994,10 +1005,7 @@ def build_qc_stoplight_summary(qc_dict, n_points):
                 continue
             flag_counts = variable_tests[test]["flag_counts"]
 
-            status, has_flag_8 = qc_status(
-                flag_counts,
-                n_points,
-            )
+            status, has_flag_8 = qc_status(flag_counts)
 
             row.append((status, has_flag_8))
 
