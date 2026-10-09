@@ -1903,7 +1903,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
                     aspect=_image_aspect(fig_name),
                     max_h=100
                 )
-                pdf.body(f"{var} ranges: {min_val} to {max_val} ({data[var].attrs["units"]}).")
+                pdf.body(f"{var} ranges: {min_val} to {max_val} ({data[var].attrs['units']}).")
     except Exception as err:
         log_warn(f"Glidertest failed on Global Range plotting: {err}")
 
