@@ -1673,6 +1673,7 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     #   Units should be handled appropriately in var attributes
     required_vars = {
         "PSAL": ["PRAC_SALINITY", "CTDSAL", "SALINITY"],
+        "CNDC": ["CONDUCTIVITY", "CTDCOND"],
         "DOXY": [
             "OXYGEN_CONCENTRATION",
             "MOLAR_DOXY_ADJUSTED",
