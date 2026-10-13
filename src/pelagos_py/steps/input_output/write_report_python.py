@@ -41,6 +41,7 @@ from fpdf.fonts import FontFace
 from datetime import datetime, timezone
 import getpass
 from glidertest import plots as gtplots
+import gsw
 import os
 import platform
 import json
@@ -51,8 +52,10 @@ from importlib.metadata import version, PackageNotFoundError
 import matplotlib.pyplot as plt
 import xarray as xr
 import numpy as np
+import polars as pl
 
 from pelagos_py.utils.console import progress_bar
+from pelagos_py.utils.processing_utils import oxy_mmolm3_to_umolkg
 
 
 #   The core PDF fonts are latin-1 only. Map the symbols we expect to plain
@@ -1529,6 +1532,7 @@ def glider_track_map(data: xr.Dataset, outdir: str, ext: str = ".png") -> str:
     return fname
 
 
+#   TODO: Make this more modular without needing make_plots
 def qc_hist(
     data: xr.Dataset,
     outdir: str,
@@ -1975,8 +1979,90 @@ def optode_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print, log
     log_warn : callable, optional
         Function used to report warnings (passing `log_warn` function in).
     """
-    breakpoint()
-    pass
+ 
+    import matplotlib.dates as mdates
+
+    missing = [
+        var for var in ["TIME", "LONGITUDE", "LATITUDE", "CONS_TEMP", "ABS_SALINITY", "DENSITY", "PRES", "DOXY"]
+        if var not in data
+    ]
+    if missing:
+        log_warn(f"{missing} required for oxygen analysis step. Check dataset or add `Derive CTD` step.")
+        return
+
+    #   Note: Solubility is typically reported in μmol/kg and as such, data.DOXY needs to be checked
+    oxy_umolkg = oxy_mmolm3_to_umolkg(data.DOXY, data.DENSITY)
+    if oxy_umolkg is None:
+        log_warn("Could not convert DOXY to umol/kg. Check DOXY and DENSITY.")
+        return
+
+    #   Init polars - drop incomplete rows
+    df = pl.DataFrame(
+        {
+            "time": data["TIME"].values.astype("datetime64[ms]"),
+            "pres": data["PRES"].values.astype(float),
+            "oxy": oxy_umolkg.values.astype(float),
+            "SA": data["ABS_SALINITY"].values.astype(float),
+            "CT": data["CONS_TEMP"].values.astype(float),
+            "lon": data["LONGITUDE"].values.astype(float),
+            "lat": data["LATITUDE"].values.astype(float),
+        },
+        nan_to_null=True,
+    ).drop_nulls()
+
+    o2sol = gsw.O2sol(*(df[c].to_numpy() for c in ["SA", "CT", "pres", "lon", "lat"]))
+
+    #   Bin data by day and by 0.5 dbar
+    bin_size = 0.5
+    binned = (
+        df.with_columns(
+            pl.Series("o2sol", o2sol),
+            pl.col("time").dt.truncate("1d").alias("day"),
+            ((pl.col("pres") / bin_size).floor() * bin_size + bin_size / 2).alias("pres_bin"),
+        )
+        .with_columns((pl.col("oxy") - pl.col("o2sol")).alias("residual"))
+        .group_by("day", "pres_bin")
+        .agg(pl.col("oxy", "o2sol", "residual").median())
+        .sort("day", "pres_bin")
+    )
+    day_num = mdates.date2num(binned["day"].to_numpy())
+    pres = binned["pres_bin"].to_numpy()
+
+    fig = plt.figure(figsize=(10, 5.6), layout="constrained")
+    gs = fig.add_gridspec(1, 4, width_ratios=[1, 1, 1, 0.05])
+    ax0 = fig.add_subplot(gs[0, 0])
+    axes = [ax0] + [fig.add_subplot(gs[0, i], sharey=ax0) for i in (1, 2)]
+    cax = fig.add_subplot(gs[0, 3])
+    panels = [
+        ("oxy", "Oxygen"),
+        ("o2sol", "O$_2$ solubility"),
+        ("residual", "Oxygen - O$_2$ solubility"),
+    ]
+    for ax, (col, title) in zip(axes, panels):
+        sc = ax.scatter(
+            binned[col].to_numpy(), pres, c=day_num, cmap="viridis", s=4, linewidths=0
+        )
+        ax.set_title(title)
+        ax.set_xlabel(r"[$\mu$mol kg$^{-1}$]")
+        ax.grid(True, alpha=0.25, linewidth=0.6)
+    axes[2].axvline(0, color="k", linewidth=0.8)
+    ax0.set_ylabel("Pressure [dbar]")
+    ax0.invert_yaxis()
+    for ax in axes[1:]:
+        ax.tick_params(labelleft=False)
+
+    cbar = fig.colorbar(sc, cax=cax)
+    cbar.ax.yaxis.set_major_locator(mdates.AutoDateLocator())
+    cbar.ax.yaxis.set_major_formatter(mdates.DateFormatter("%d-%b"))
+
+    fig_name = os.path.join(outdir, "optode_oxygen_profile.png")
+    fig.savefig(fig_name, dpi=150)
+    plt.close(fig)
+
+    pdf.add_page()
+    pdf.section_heading("Optode Assessment")
+    pdf.image_fit(fig_name, aspect=_image_aspect(fig_name), max_h=110)
+    log("Optode section written out.")
 
 
 def cross_section_figure(data: xr.Dataset, outdir: str, ext: str = ".png") -> str:
