@@ -1947,6 +1947,10 @@ def glidertest_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print,
     log("Glidertest section written out.")
 
 
+def optode_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print, log_warn=print) -> None:
+    pass
+
+
 def cross_section_figure(data: xr.Dataset, outdir: str, ext: str = ".png") -> str:
     #   A4-portrait stack of PRES-vs-TIME panels (see _CROSS_SECTION_PANELS), one
     #   per variable, sharing the TIME axis, each with a profile strip and
@@ -2265,6 +2269,13 @@ class WriteDataReportPython(BaseStep):
             "description": (
                 "Generate additional figures as done in glidertest's summary sheet."
             )
+        },
+        "show_oxy_foil_check": {
+            "type": bool,
+            "default": False,
+            "description": (
+                "Generate additional figures for assessing oxygen drift and performance related to optode foil."
+            )
         }
     }
 
@@ -2395,6 +2406,10 @@ class WriteDataReportPython(BaseStep):
             if self.parameters.get("show_glidertest", True):
                 self.log("Generating figures from glidertest.")
                 glidertest_section(pdf, data, fig_dir, log=self.log, log_warn=self.log_warn)
+
+            if self.parameters.get("show_oxy_foil_check", True):
+                self.log("Generating additional figures for optode assessment.")
+                optode_section(pdf, data, fig_dir, log=self.log, log_warn=self.log_warn)
                 
             if self.parameters.get("show_logs", True):
                 log_path = odir + self.context["global_parameters"]["log_file"]
