@@ -50,6 +50,7 @@ import tempfile
 import yaml
 from importlib.metadata import version, PackageNotFoundError
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import xarray as xr
 import numpy as np
 import polars as pl
@@ -1980,12 +1981,10 @@ def optode_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print, log
         Function used to report warnings (passing `log_warn` function in).
     """
  
-    import matplotlib.dates as mdates
+    
 
-    missing = [
-        var for var in ["TIME", "LONGITUDE", "LATITUDE", "CONS_TEMP", "ABS_SALINITY", "DENSITY", "PRES", "DOXY"]
-        if var not in data
-    ]
+    required = ["TIME", "PRES", "ABS_SALINITY", "CONS_TEMP", "LONGITUDE", "LATITUDE", "DOXY", "DENSITY"]
+    missing = [var for var in required if var not in data]
     if missing:
         log_warn(f"{missing} required for oxygen analysis step. Check dataset or add `Derive CTD` step.")
         return
@@ -1996,64 +1995,48 @@ def optode_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print, log
         log_warn("Could not convert DOXY to umol/kg. Check DOXY and DENSITY.")
         return
 
-    #   Init polars - drop incomplete rows
+    #   Init polars - drop incomplete rows before running gsw
     df = pl.DataFrame(
-        {
-            "time": data["TIME"].values.astype("datetime64[ms]"),
-            "pres": data["PRES"].values.astype(float),
-            "oxy": oxy_umolkg.values.astype(float),
-            "SA": data["ABS_SALINITY"].values.astype(float),
-            "CT": data["CONS_TEMP"].values.astype(float),
-            "lon": data["LONGITUDE"].values.astype(float),
-            "lat": data["LATITUDE"].values.astype(float),
-        },
+        {var: data[var].values for var in required} | {"oxy": oxy_umolkg.values},
         nan_to_null=True,
     ).drop_nulls()
+    o2sol = pl.Series(gsw.O2sol(*(df[v].to_numpy() for v in ["ABS_SALINITY", "CONS_TEMP", "PRES", "LONGITUDE", "LATITUDE"])))
 
-    o2sol = gsw.O2sol(*(df[c].to_numpy() for c in ["SA", "CT", "pres", "lon", "lat"]))
-
-    #   Bin data by day and by 0.5 dbar
+    #   Bin data by day and by 0.5 dbar (lower bin edge)
     bin_size = 0.5
     binned = (
         df.with_columns(
-            pl.Series("o2sol", o2sol),
-            pl.col("time").dt.truncate("1d").alias("day"),
-            ((pl.col("pres") / bin_size).floor() * bin_size + bin_size / 2).alias("pres_bin"),
+            o2sol=o2sol,
+            residual=pl.col("oxy") - o2sol,
+            day=pl.col("TIME").dt.truncate("1d"),
+            pres_bin=pl.col("PRES") // bin_size * bin_size,
         )
-        .with_columns((pl.col("oxy") - pl.col("o2sol")).alias("residual"))
         .group_by("day", "pres_bin")
         .agg(pl.col("oxy", "o2sol", "residual").median())
         .sort("day", "pres_bin")
     )
-    day_num = mdates.date2num(binned["day"].to_numpy())
-    pres = binned["pres_bin"].to_numpy()
 
-    fig = plt.figure(figsize=(10, 5.6), layout="constrained")
-    gs = fig.add_gridspec(1, 4, width_ratios=[1, 1, 1, 0.05])
-    ax0 = fig.add_subplot(gs[0, 0])
-    axes = [ax0] + [fig.add_subplot(gs[0, i], sharey=ax0) for i in (1, 2)]
-    cax = fig.add_subplot(gs[0, 3])
-    panels = [
-        ("oxy", "Oxygen"),
-        ("o2sol", "O$_2$ solubility"),
-        ("residual", "Oxygen - O$_2$ solubility"),
-    ]
+    #   Sampling levels for the weekly table: the surface (0% of max) and percentages
+    #   of the max pressure, snapped to their pressure bin.
+    max_pres = df["PRES"].max()
+    fractions = (0.01, 0.25, 0.50)
+    levels = {f"{f:.0%}": f * max_pres // bin_size * bin_size for f in fractions}
+
+    panels = [("oxy", "Oxygen"), ("o2sol", "O2 solubility"), ("residual", "Oxygen - O2 solubility")]
+    fig, axes = plt.subplots(1, 3, figsize=(10, 5.6), sharey=True, layout="constrained")
     for ax, (col, title) in zip(axes, panels):
         sc = ax.scatter(
-            binned[col].to_numpy(), pres, c=day_num, cmap="viridis", s=4, linewidths=0
+            binned[col], binned["pres_bin"], c=mdates.date2num(binned["day"].to_numpy()),
+            cmap="viridis", s=4, linewidths=0,
         )
-        ax.set_title(title)
-        ax.set_xlabel(r"[$\mu$mol kg$^{-1}$]")
+        ax.set(title=title, xlabel=r"[$\mu$mol kg$^{-1}$]")
         ax.grid(True, alpha=0.25, linewidth=0.6)
+        for p in levels.values():
+            ax.axhline(p, color="0.4", linestyle="--", linewidth=0.8, zorder=0)
     axes[2].axvline(0, color="k", linewidth=0.8)
-    ax0.set_ylabel("Pressure [dbar]")
-    ax0.invert_yaxis()
-    for ax in axes[1:]:
-        ax.tick_params(labelleft=False)
-
-    cbar = fig.colorbar(sc, cax=cax)
-    cbar.ax.yaxis.set_major_locator(mdates.AutoDateLocator())
-    cbar.ax.yaxis.set_major_formatter(mdates.DateFormatter("%d-%b"))
+    axes[0].set_ylabel("Pressure [dbar]")
+    axes[0].invert_yaxis()
+    fig.colorbar(sc, ax=axes, ticks=mdates.AutoDateLocator(), format=mdates.DateFormatter("%d-%b"))
 
     fig_name = os.path.join(outdir, "optode_oxygen_profile.png")
     fig.savefig(fig_name, dpi=150)
@@ -2062,6 +2045,26 @@ def optode_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print, log
     pdf.add_page()
     pdf.section_heading("Optode Assessment")
     pdf.image_fit(fig_name, aspect=_image_aspect(fig_name), max_h=110)
+
+    #   Weekly snapshot: first sampled day of each 7-day block from the start,
+    #   at the surface (0) and some other percentages of the max pressure
+    days = binned["day"].unique().sort()
+    weekly = days.filter(((days - days[0]).dt.total_days() // 7).is_first_distinct())
+    lookup = {
+        (r["day"], r["pres_bin"]): r
+        for r in binned.filter(pl.col("day").is_in(weekly)).iter_rows(named=True)
+    }
+    rows = [
+        [day.strftime("%d-%b")] + [
+            "\n".join(f"{lvl}: {lookup.get((day, p), {}).get(col, np.nan):.1f}" for lvl, p in levels.items())
+            for col, _ in panels
+        ]
+        for day in weekly
+    ]
+    pdf.ln(2)
+    pdf.add_table(["Date"] + [title for _, title in panels], rows, widths=(16, 28, 28, 28))
+    pdf.body(f"Values in umol/kg are medians of {bin_size:g} dbar bins.")
+    pdf.body(f"Max pressure: {max_pres:.1f} dbar; " + "; ".join(f"{f:.0%}: {f * max_pres:.1f} dbar" for f in fractions[1:]) + ".")
     log("Optode section written out.")
 
 
