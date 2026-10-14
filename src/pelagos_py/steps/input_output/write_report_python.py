@@ -2043,7 +2043,7 @@ def optode_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print, log
     plt.close(fig)
 
     pdf.add_page()
-    pdf.section_heading("Optode Assessment")
+    pdf.section_heading("Oxygen vs Solubility Assessment")
     pdf.image_fit(fig_name, aspect=_image_aspect(fig_name), max_h=110)
 
     #   Weekly snapshot: first sampled day of each 7-day block from the start,
@@ -2065,6 +2065,13 @@ def optode_section(pdf: ReportPDF, data: xr.Dataset, outdir: str, log=print, log
     pdf.add_table(["Date"] + [title for _, title in panels], rows, widths=(16, 28, 28, 28))
     pdf.body(f"Values in umol/kg are medians of {bin_size:g} dbar bins.")
     pdf.body(f"Max pressure: {max_pres:.1f} dbar; " + "; ".join(f"{f:.0%}: {f * max_pres:.1f} dbar" for f in fractions[1:]) + ".")
+
+    #   Provide sensor info: Most detailed if available, 
+    # if "sensor" in data.DOXY.attrs:
+    pdf.add_page()
+    details = data[data.DOXY.attrs["sensor"]].attrs if "sensor" in data.DOXY.attrs else {}
+    details = details | data.DOXY.attrs
+    pdf.add_table(["Attribute", "Value"], [[k, v] for k, v in details.items()], widths=(1, 3))
     log("Optode section written out.")
 
 
